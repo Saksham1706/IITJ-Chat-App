@@ -31,3 +31,7 @@ Authentication: Flask-Login with session management 🔑
 File Storage: Local filesystem (configurable for cloud storage) ☁️
 
 Frontend: HTML, CSS, JavaScript (templates not shown in code) 🎨
+
+![image](https://github.com/user-attachments/assets/080922c6-d80d-4b50-b1e6-106c7655ea27)
+
+
