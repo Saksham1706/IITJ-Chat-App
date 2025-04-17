@@ -1,20 +1,33 @@
-IITJ Chat App
-A real-time, full-stack chat application designed for IIT Jodhpur students, featuring private and public messaging, global chat, file sharing, and group chats. This app integrates advanced Data Structures and Algorithms (DSA) to efficiently handle user authentication, signup/login, and data retrieval, ensuring optimal performance for the community.
+The IITJ Chat Application is a real-time messaging platform designed for the IIT Jodhpur community. It provides both public and private chat rooms, direct messaging between users, and file sharing capabilities. The application features a robust backend with proper authentication, authorization, and data management.
 
-🚀 Features
-🔐 User Authentication (Login/Signup): Secure login system using hashing to store passwords and verify users.
+Features 🌟
+🔐 User Authentication: Secure login/signup with password hashing
 
-🌐 Global Public Chat: A real-time public chatroom accessible by all users for campus-wide interaction.
+🏠 Public and Private Chat Rooms: Create and join different chat rooms
 
-👥 Group Chats: Create and join groups to collaborate on projects, study, or have casual discussions.
+💬 Direct Messaging: Private one-on-one conversations
 
-📎 File Sharing: Send media files such as images, PDFs, and audio between users, both privately and in group chats.
+📁 File Sharing: Upload and share files (documents, images, etc.)
 
-🔍 Username Search & Auto-complete: Uses a Trie to efficiently search for users and provide auto-completion.
+⚡ Real-time Updates: Instant messaging with Socket.IO
 
-📝 Chat History: Store chat logs for future retrieval in private and group chats, and globally accessible messages.
+👨‍💼 Admin Dashboard: Manage users, rooms, and messages
 
-🧑‍💻 Multi-client Support: Real-time messaging with support for multiple connected users simultaneously.
+🕰️ Message History: View past messages in rooms
 
-🎓 Built for IIT Jodhpur: The app is designed specifically for the IITJ campus, enabling better communication and collaboration.
+🔔 Unread Message Tracking: Know when you have unread messages
 
+🌳 Room Hierarchy: Organized room structure with parent-child relationships
+
+Technologies Used 🛠️
+Backend: Python with Flask framework 🐍
+
+Database: SQLAlchemy ORM with SQLite (can be configured for PostgreSQL/MySQL) 🗄️
+
+Real-time Communication: Socket.IO 🔌
+
+Authentication: Flask-Login with session management 🔑
+
+File Storage: Local filesystem (configurable for cloud storage) ☁️
+
+Frontend: HTML, CSS, JavaScript (templates not shown in code) 🎨
