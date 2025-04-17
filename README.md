@@ -2,7 +2,7 @@ IITJ Chat App
 A real-time, full-stack chat application designed for IIT Jodhpur students, featuring private and public messaging, global chat, file sharing, and group chats. This app integrates advanced Data Structures and Algorithms (DSA) to efficiently handle user authentication, signup/login, and data retrieval, ensuring optimal performance for the community.
 
 🚀 Features
-🔐 User Authentication (Login/Signup): Secure login system using hashing (e.g., SHA-256 or bcrypt) to store passwords and verify users.
+🔐 User Authentication (Login/Signup): Secure login system using hashing to store passwords and verify users.
 
 🌐 Global Public Chat: A real-time public chatroom accessible by all users for campus-wide interaction.
 
