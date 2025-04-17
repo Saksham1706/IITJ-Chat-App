@@ -1,0 +1,223 @@
+<!-- templates/admin.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - IITJ Chat</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body>
+    <div class="admin-container">
+        <nav class="admin-sidebar">
+            <div class="admin-header">
+                <h1>Admin Panel</h1>
+                <p>{{ current_user.username }}</p>
+            </div>
+            <ul class="admin-menu">
+                <li class="active" data-section="dashboard">Dashboard</li>
+                <li data-section="users">User Management</li>
+                <li data-section="rooms">Room Management</li>
+                <li data-section="messages">Message Moderation</li>
+                <li data-section="files">File Management</li>
+            </ul>
+            <div class="admin-footer">
+                <a href="{{ url_for('index') }}" class="back-btn">Back to Chat</a>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            </div>
+        </nav>
+        
+        <main class="admin-content">
+            <section id="dashboard" class="admin-section active">
+                <h2>Dashboard</h2>
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <h3>Total Users</h3>
+                        <div class="stat-number" id="total-users">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Rooms</h3>
+                        <div class="stat-number" id="total-rooms">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Messages</h3>
+                        <div class="stat-number" id="total-messages">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Files</h3>
+                        <div class="stat-number" id="total-files">Loading...</div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="users" class="admin-section">
+                <h2>User Management</h2>
+                <div class="action-bar">
+                    <button id="create-user-btn" class="create-btn">Create User</button>
+                    <input type="text" id="user-search" placeholder="Search users...">
+                </div>
+                <div class="table-container">
+                    <table id="users-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-list">
+                            <!-- Users will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <section id="rooms" class="admin-section">
+                <h2>Room Management</h2>
+                <div class="action-bar">
+                    <button id="create-room-btn" class="create-btn">Create Room</button>
+                    <input type="text" id="room-search" placeholder="Search rooms...">
+                </div>
+                <div class="table-container">
+                    <table id="rooms-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Created At</th>
+                                <th>Created By</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rooms-list">
+                            <!-- Rooms will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <section id="messages" class="admin-section">
+                <h2>Message Moderation</h2>
+                <div class="action-bar">
+                    <select id="message-room-filter">
+                        <option value="">All Rooms</option>
+                    </select>
+                    <input type="text" id="message-search" placeholder="Search messages...">
+                </div>
+                <div class="table-container">
+                    <table id="messages-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>User</th>
+                                <th>Room</th>
+                                <th>Content</th>
+                                <th>Timestamp</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="messages-list">
+                            <!-- Messages will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <section id="files" class="admin-section">
+                <h2>File Management</h2>
+                <div class="action-bar">
+                    <select id="file-type-filter">
+                        <option value="">All Types</option>
+                        <option value="image">Images</option>
+                        <option value="document">Documents</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <input type="text" id="file-search" placeholder="Search files...">
+                </div>
+                <div class="table-container">
+                    <table id="files-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                                <th>Uploaded By</th>
+                                <th>Uploaded At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="files-list">
+                            <!-- Files will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- Modals -->
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 id="user-modal-title">Create User</h2>
+            <form id="user-form">
+                <div class="form-group">
+                    <label for="user-username">Username</label>
+                    <input type="text" id="user-username" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-email">Email</label>
+                    <input type="email" id="user-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-password">Password</label>
+                    <input type="password" id="user-password">
+                    <small>(Leave empty to keep current password)</small>
+                </div>
+                <div class="form-group">
+                    <label for="user-role">Role</label>
+                    <select id="user-role">
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="user-cancel-btn">Cancel</button>
+                    <button type="submit" id="user-save-btn">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="room-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2 id="room-modal-title">Create Room</h2>
+            <form id="room-form">
+                <div class="form-group">
+                    <label for="room-name">Room Name</label>
+                    <input type="text" id="room-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="room-type">Room Type</label>
+                    <select id="room-type">
+                        <option value="public">Public</option>
+                        <option value="private">Private</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="room-cancel-btn">Cancel</button>
+                    <button type="submit" id="room-save-btn">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>

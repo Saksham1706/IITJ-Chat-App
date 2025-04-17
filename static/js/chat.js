@@ -1,0 +1,731 @@
+// chat.js - Main chat application functionality
+
+document.addEventListener('DOMContentLoaded', () => {
+    // DOM Elements
+    const roomsList = document.getElementById('rooms-list');
+    const usersList = document.getElementById('users-list');
+    const tabButtons = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const createRoomBtn = document.getElementById('create-room-btn');
+    const createRoomModal = document.getElementById('create-room-modal');
+    const createRoomForm = document.getElementById('create-room-form');
+    const closeModalBtns = document.querySelectorAll('.close-modal-btn');
+    const cancelBtns = document.querySelectorAll('.cancel-btn');
+    const messagesContainer = document.getElementById('messages');
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const roomInfoElement = document.getElementById('room-info');
+    const chatContainer = document.getElementById('chat-container');
+    const backBtn = document.getElementById('back-btn');
+    const currentChatName = document.getElementById('current-chat-name');
+    const currentChatUsers = document.getElementById('current-chat-users');
+    const messageInputContainer = document.getElementById('message-input-container');
+    const leaveRoomBtn = document.getElementById('leave-room-btn');
+    const roomInfoBtn = document.getElementById('room-info-btn');
+    const roomInfoModal = document.getElementById('room-info-modal');
+    const roomUsersListElement = document.getElementById('room-users-list');
+    const roomCreatedDate = document.getElementById('room-created-date');
+    const roomCreatedBy = document.getElementById('room-created-by');
+    const roomType = document.getElementById('room-type');
+    const roomSearch = document.getElementById('room-search');
+    const userSearch = document.getElementById('user-search');
+    const attachmentBtn = document.getElementById('attachment-btn');
+    const fileUploadMenu = document.getElementById('file-upload-menu');
+    const closeUploadBtn = document.getElementById('close-upload-btn');
+    const fileUploadForm = document.getElementById('file-upload-form');
+    const fileInput = document.getElementById('file-input');
+
+    // Application state
+    let currentUser = null;
+    let currentRoom = null;
+    let currentDMUser = null;
+    let activeTab = 'rooms';
+    let rooms = [];
+    let users = [];
+    let unreadCounts = {};
+    let socket = null;
+
+    // Initialize Socket.IO connection
+    function initializeSocket() {
+        socket = io();
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            loadRooms();
+            loadUsers();
+            loadUnreadCounts();
+        });
+
+        socket.on('connected', (data) => {
+            currentUser = data.user_id;
+        });
+
+        socket.on('message', (data) => {
+            if (currentRoom) {
+                appendMessage(data);
+                scrollToBottom();
+            }
+        });
+
+        socket.on('direct_message', (data) => {
+            // Get the current user's username
+            const currentUsername = document.querySelector('.username').textContent;
+            
+            if (currentDMUser) {
+                // Check if this message belongs to the current conversation
+                if ((data.sender_username === currentDMUser.username && data.recipient_username === currentUsername) ||
+                    (data.recipient_username === currentDMUser.username && data.sender_username === currentUsername)) {
+                    appendDirectMessage(data);
+                    scrollToBottom();
+                }
+            } else {
+                // Update unread count if not in conversation with this user
+                loadUnreadCounts();
+                updateUsersList();
+            }
+        });
+
+        socket.on('chat_history', (data) => {
+            displayMessages(data.messages);
+        });
+
+        socket.on('error', (data) => {
+            showNotification(data.message, 'error');
+        });
+    }
+
+    // Load rooms from the server
+    function loadRooms() {
+        fetch('/api/rooms')
+            .then(response => response.json())
+            .then(data => {
+                rooms = data;
+                updateRoomsList();
+            })
+            .catch(error => {
+                console.error('Error loading rooms:', error);
+                showNotification('Failed to load rooms', 'error');
+            });
+    }
+
+    // Load users from the server
+    function loadUsers() {
+        fetch('/api/users')
+            .then(response => response.json())
+            .then(data => {
+                users = data;
+                updateUsersList();
+            })
+            .catch(error => {
+                console.error('Error loading users:', error);
+                showNotification('Failed to load users', 'error');
+            });
+    }
+
+    // Load unread message counts
+    function loadUnreadCounts() {
+        fetch('/api/direct-messages/unread')
+            .then(response => response.json())
+            .then(data => {
+                unreadCounts = data;
+                updateUsersList();
+            })
+            .catch(error => {
+                console.error('Error loading unread counts:', error);
+            });
+    }
+
+    // Update the rooms list in the UI
+    function updateRoomsList() {
+        roomsList.innerHTML = '';
+        
+        const filteredRooms = roomSearch.value ? 
+            rooms.filter(room => room.name.toLowerCase().includes(roomSearch.value.toLowerCase())) : 
+            rooms;
+        
+        filteredRooms.forEach(room => {
+            const roomElement = document.createElement('div');
+            roomElement.className = 'room-item';
+            if (currentRoom && currentRoom.id === room.id) {
+                roomElement.classList.add('active');
+            }
+            
+            roomElement.innerHTML = `
+                <div class="room-name">${room.name}</div>
+                <div class="room-meta">
+                    <span class="room-type">${room.is_private ? 'Private' : 'Public'}</span>
+                </div>
+            `;
+            
+            roomElement.addEventListener('click', () => {
+                joinRoom(room);
+            });
+            
+            roomsList.appendChild(roomElement);
+        });
+    }
+
+    // Update the users list in the UI
+    function updateUsersList() {
+        usersList.innerHTML = '';
+        
+        const filteredUsers = userSearch.value ? 
+            users.filter(user => user.username.toLowerCase().includes(userSearch.value.toLowerCase())) : 
+            users;
+        
+        filteredUsers.forEach(user => {
+            // Skip current user
+            if (user.id === currentUser) return;
+            
+            const userElement = document.createElement('div');
+            userElement.className = 'user-item';
+            if (currentDMUser && currentDMUser.id === user.id) {
+                userElement.classList.add('active');
+            }
+            
+            const unreadCount = unreadCounts[user.id] || 0;
+            const unreadBadge = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : '';
+            
+            userElement.innerHTML = `
+                <div class="user-name">${user.username}</div>
+                ${unreadBadge}
+            `;
+            
+            userElement.addEventListener('click', () => {
+                startDirectMessage(user);
+            });
+            
+            usersList.appendChild(userElement);
+        });
+    }
+
+    // Join a chat room
+    function joinRoom(room) {
+        currentRoom = room;
+        currentDMUser = null;
+        
+        // Clear the messages container
+        messagesContainer.innerHTML = '';
+        
+        // Update UI for room view
+        roomInfoElement.style.display = 'flex';
+        messageInputContainer.style.display = 'flex';
+        currentChatName.textContent = room.name;
+        
+        // Emit join event to server
+        socket.emit('join', { room_id: room.id });
+        
+        // Update active room in the list
+        updateRoomsList();
+        
+        // Hide welcome message
+        document.querySelector('.welcome-message').style.display = 'none';
+    }
+
+    // Start a direct message conversation
+    function startDirectMessage(user) {
+        currentDMUser = user;
+        currentRoom = null;
+        
+        // Clear the messages container
+        messagesContainer.innerHTML = '';
+        
+        // Update UI for DM view
+        roomInfoElement.style.display = 'flex';
+        messageInputContainer.style.display = 'flex';
+        currentChatName.textContent = user.username;
+        currentChatUsers.textContent = 'Direct Message';
+        
+        // Load direct message history
+        loadDirectMessages(user.id);
+        
+        // Update active user in the list
+        updateUsersList();
+        
+        // Hide welcome message
+        document.querySelector('.welcome-message').style.display = 'none';
+    }
+
+    // Load direct messages for a specific user
+    function loadDirectMessages(userId) {
+        fetch(`/api/direct-messages/${userId}`)
+            .then(response => response.json())
+            .then(data => {
+                displayDirectMessages(data);
+            })
+            .catch(error => {
+                console.error('Error loading direct messages:', error);
+                showNotification('Failed to load messages', 'error');
+            });
+    }
+
+    // Display messages in the UI
+    function displayMessages(messages) {
+        messagesContainer.innerHTML = '';
+        messages.forEach(message => {
+            appendMessage(message);
+        });
+        scrollToBottom();
+    }
+
+    // Display direct messages in the UI
+    function displayDirectMessages(messages) {
+        messagesContainer.innerHTML = '';
+        messages.forEach(message => {
+            appendDirectMessage(message);
+        });
+        scrollToBottom();
+    }
+
+    // Updated appendMessage function
+    function appendMessage(message) {
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message';
+        
+        const isCurrentUser = message.username === document.querySelector('.username').textContent;
+        if (isCurrentUser) {
+            messageElement.classList.add('own-message');
+        }
+        
+        let messageContent = '';
+        if (message.is_file) {
+            const fileExtension = message.file_path.split('.').pop().toLowerCase();
+            const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension);
+            
+            if (isImage) {
+                messageContent = `
+                    <a href="/uploads/${message.file_path}" target="_blank" class="image-link">
+                        <img src="/uploads/${message.file_path}" alt="Shared image" class="shared-image" 
+                            onclick="openImageModal('/uploads/${message.file_path}'); return false;">
+                    </a>
+                `;
+            } else {
+                messageContent = `
+                    <div class="file-attachment">
+                        <span class="file-icon">📎</span>
+                        <a href="/uploads/${message.file_path}" target="_blank">${message.content.replace('Shared file: ', '')}</a>
+                    </div>
+                `;
+            }
+        } else {
+            messageContent = `<p>${message.content}</p>`;
+        }
+        
+        messageElement.innerHTML = `
+            <div class="message-header">
+                <span class="message-author">${message.username}</span>
+                <span class="message-time">${message.timestamp}</span>
+            </div>
+            <div class="message-content">
+                ${messageContent}
+            </div>
+        `;
+        
+        messagesContainer.appendChild(messageElement);
+    }
+
+    // Updated appendDirectMessage function
+    function appendDirectMessage(message) {
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message';
+        
+        const isCurrentUser = message.sender_username === document.querySelector('.username').textContent;
+        if (isCurrentUser) {
+            messageElement.classList.add('own-message');
+        }
+        
+        let messageContent = '';
+        if (message.is_file) {
+            const fileExtension = message.file_path.split('.').pop().toLowerCase();
+            const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension);
+            
+            if (isImage) {
+                messageContent = `
+                    <a href="/uploads/${message.file_path}" target="_blank" class="image-link">
+                        <img src="/uploads/${message.file_path}" alt="Shared image" class="shared-image" 
+                            onclick="openImageModal('/uploads/${message.file_path}'); return false;">
+                    </a>
+                `;
+            } else {
+                messageContent = `
+                    <div class="file-attachment">
+                        <span class="file-icon">📎</span>
+                        <a href="/uploads/${message.file_path}" target="_blank">${message.content.replace('Shared file: ', '')}</a>
+                    </div>
+                `;
+            }
+        } else {
+            messageContent = `<p>${message.content}</p>`;
+        }
+        
+        messageElement.innerHTML = `
+            <div class="message-header">
+                <span class="message-author">${message.sender_username}</span>
+                <span class="message-time">${message.timestamp}</span>
+            </div>
+            <div class="message-content">
+                ${messageContent}
+            </div>
+        `;
+        
+        messagesContainer.appendChild(messageElement);
+    }
+    function appendDirectMessage(message) {
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message';
+        
+        const isCurrentUser = message.sender_username === document.querySelector('.username').textContent;
+        if (isCurrentUser) {
+            messageElement.classList.add('own-message');
+        }
+        
+        let messageContent = '';
+        if (message.is_file) {
+            const fileExtension = message.file_path.split('.').pop().toLowerCase();
+            const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension);
+            
+            if (isImage) {
+                messageContent = `
+                    <a href="/uploads/${message.file_path}" target="_blank" class="image-link">
+                        <img src="/uploads/${message.file_path}" alt="Shared image" class="shared-image" 
+                             onclick="openImageModal('/uploads/${message.file_path}'); return false;">
+                    </a>
+                `;
+            } else {
+                messageContent = `
+                    <div class="file-attachment">
+                        <span class="file-icon">📎</span>
+                        <a href="/uploads/${message.file_path}" target="_blank">${message.content.replace('Shared file: ', '')}</a>
+                    </div>
+                `;
+            }
+        } else {
+            messageContent = `<p>${message.content}</p>`;
+        }
+        
+        messageElement.innerHTML = `
+            <div class="message-header">
+                <span class="message-author">${message.sender_username}</span>
+                <span class="message-time">${message.timestamp}</span>
+            </div>
+            <div class="message-content">
+                ${messageContent}
+            </div>
+        `;
+        
+        messagesContainer.appendChild(messageElement);
+    }
+
+    // Send a message
+    function sendMessage() {
+        const messageText = messageInput.value.trim();
+        if (!messageText) return;
+        
+        if (currentRoom) {
+            socket.emit('message', { text: messageText });
+        } else if (currentDMUser) {
+            socket.emit('direct_message', { recipient_id: currentDMUser.id, text: messageText });
+        }
+        
+        messageInput.value = '';
+    }
+
+    function uploadFile(event) {
+        event.preventDefault();
+        
+        const file = fileInput.files[0];
+        if (!file) {
+            showNotification('No file selected', 'error');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Show a loading indicator in the chat
+        const tempMessageId = 'temp-' + Date.now();
+        const loadingMessage = document.createElement('div');
+        loadingMessage.className = 'message own-message';
+        loadingMessage.id = tempMessageId;
+        loadingMessage.innerHTML = `
+            <div class="message-header">
+                <span class="message-author">${document.querySelector('.username').textContent}</span>
+                <span class="message-time">Uploading...</span>
+            </div>
+            <div class="message-content">
+                <div class="file-uploading">
+                    <span class="file-icon">📤</span>
+                    <span>Uploading ${file.name}...</span>
+                </div>
+            </div>
+        `;
+        messagesContainer.appendChild(loadingMessage);
+        scrollToBottom();
+        
+        if (currentRoom) {
+            formData.append('room_id', currentRoom.id);
+        } else if (currentDMUser) {
+            formData.append('recipient_id', currentDMUser.id);
+        }
+        
+        fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Remove the loading message
+            const loadingElement = document.getElementById(tempMessageId);
+            if (loadingElement) {
+                messagesContainer.removeChild(loadingElement);
+            }
+            
+            // Don't manually add the message - the socket will handle it
+            // The server emits a 'message' or 'direct_message' event that will add the file message
+            
+            fileUploadMenu.style.display = 'none';
+            fileInput.value = '';
+            showNotification('File uploaded successfully', 'success');
+        })
+        .catch(error => {
+            console.error('Error uploading file:', error);
+            // Remove the loading message
+            const loadingElement = document.getElementById(tempMessageId);
+            if (loadingElement) {
+                messagesContainer.removeChild(loadingElement);
+            }
+            showNotification('Failed to upload file', 'error');
+        });
+    }
+    
+    // Create a new room
+    function createRoom(event) {
+        event.preventDefault();
+        
+        const roomName = document.getElementById('new-room-name').value.trim();
+        const isPrivate = document.getElementById('is-private-room').checked;
+        
+        if (!roomName) return;
+        
+        fetch('/api/rooms', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                room_name: roomName,
+                is_private: isPrivate
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Room creation failed');
+            }
+            return response.json();
+        })
+        .then(data => {
+            createRoomModal.style.display = 'none';
+            document.getElementById('new-room-name').value = '';
+            document.getElementById('is-private-room').checked = false;
+            showNotification('Room created successfully', 'success');
+            loadRooms();
+        })
+        .catch(error => {
+            console.error('Error creating room:', error);
+            showNotification('Failed to create room', 'error');
+        });
+    }
+
+    // Leave the current room
+    function leaveRoom() {
+        if (currentRoom) {
+            socket.emit('leave');
+            currentRoom = null;
+            resetChatView();
+        }
+    }
+
+    // Show room information
+    function showRoomInfo() {
+        if (!currentRoom) return;
+        
+        // Find the room in our loaded rooms array
+        const room = rooms.find(r => r.id === currentRoom.id);
+        if (!room) return;
+        
+        roomCreatedDate.textContent = room.created_at;
+        roomType.textContent = room.is_private ? 'Private' : 'Public';
+        
+        // Get the creator's username (this might need additional API in a real implementation)
+        roomCreatedBy.textContent = 'Unknown'; // This should be replaced with actual data
+        
+        // Room users would need an additional API to get current users in room
+        roomUsersListElement.innerHTML = '<li>Loading users...</li>';
+        
+        roomInfoModal.style.display = 'block';
+    }
+
+    // Reset the chat view to default state
+    function resetChatView() {
+        roomInfoElement.style.display = 'none';
+        messageInputContainer.style.display = 'none';
+        document.querySelector('.welcome-message').style.display = 'block';
+        messagesContainer.innerHTML = '';
+        messagesContainer.appendChild(document.querySelector('.welcome-message'));
+    }
+
+    // Helper to scroll the messages container to the bottom
+    function scrollToBottom() {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Show a notification message
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 10);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 300);
+        }, 3000);
+    }
+
+    // Event Listeners
+    
+    // Tab switching
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const tab = button.getAttribute('data-tab');
+            
+            // Update active tab
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            button.classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+            
+            activeTab = tab;
+        });
+    });
+    
+    // Create room button
+    createRoomBtn.addEventListener('click', () => {
+        createRoomModal.style.display = 'block';
+    });
+    
+    // Close modal buttons
+    closeModalBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.style.display = 'none';
+            });
+        });
+    });
+    
+    // Cancel buttons
+    cancelBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.closest('.modal').style.display = 'none';
+        });
+    });
+    
+    // Create room form submission
+    createRoomForm.addEventListener('submit', createRoom);
+    
+    // Send message button
+    sendBtn.addEventListener('click', sendMessage);
+    
+    // Send message on Enter key
+    messageInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    });
+    
+    // Back button
+    backBtn.addEventListener('click', () => {
+        if (currentRoom) {
+            leaveRoom();
+        } else if (currentDMUser) {
+            currentDMUser = null;
+            resetChatView();
+        }
+    });
+    
+    // Leave room button
+    leaveRoomBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (currentRoom) {
+            leaveRoom();
+        }
+    });
+    
+    // Room info button
+    roomInfoBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        showRoomInfo();
+    });
+    
+    // Room search input
+    roomSearch.addEventListener('input', updateRoomsList);
+    
+    // User search input
+    userSearch.addEventListener('input', updateUsersList);
+    
+    // Attachment button
+    attachmentBtn.addEventListener('click', () => {
+        fileUploadMenu.style.display = 'block';
+    });
+    
+    // Close upload menu button
+    closeUploadBtn.addEventListener('click', () => {
+        fileUploadMenu.style.display = 'none';
+    });
+    
+    // File upload form submission
+    fileUploadForm.addEventListener('submit', uploadFile);
+    
+    // Close modals when clicking outside
+    window.addEventListener('click', (event) => {
+        document.querySelectorAll('.modal').forEach(modal => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    });
+
+        // Add these functions to the end of your main script or before the initialization
+
+    // Make modal functions globally accessible
+    window.openImageModal = function(imageSrc) {
+        const modal = document.getElementById('image-modal');
+        const modalImage = document.getElementById('modal-image');
+        modalImage.src = imageSrc;
+        modal.style.display = 'flex';
+        event.stopPropagation();
+    };
+
+    window.closeImageModal = function() {
+        const modal = document.getElementById('image-modal');
+        modal.style.display = 'none';
+    };
+
+    // Close modal with ESC key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeImageModal();
+        }
+    });
+
+    // Initialize the application
+    initializeSocket();
+});
